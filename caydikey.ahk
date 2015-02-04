@@ -1,8 +1,11 @@
 defaults() {
 	global
-	SetMouseDelay, -1
-	SetKeyDelay, -1
+	
+	#NoEnv
 	SetBatchLines, -1
+	SetMouseDelay, -1
+	SetKeyDelay, -1, -1
+	ListLines, Off
 	
 	;;;;
 	;;
@@ -62,6 +65,7 @@ Insert::
 	SendInput, ^c
 	clipboard = %buffer%%delimiter%%clipboard%
 	return
+	return
 
 ;;;;
 ;; Replaces the blank with the highlighted text.
@@ -91,9 +95,9 @@ MButton::
 	
 	MouseGetPos, xf, yf
 	if (xf = xi and yf = yi) {
-		Click, Middle
 	}
 	return	
+		Click, Middle
 
 ;;;;
 ;; Helper function that handles horizontal scrolls.
@@ -161,7 +165,7 @@ verticalMButton(byref y0, y1, previousY) {
 	}
 	clipboard := buffer
 	return
-
+	
 ;;;;
 ;;
 ;;;;
@@ -201,7 +205,12 @@ verticalMButton(byref y0, y1, previousY) {
 	previous := clipboard
 	SendInput +{ Up }
 	
-	while (!paragraph() and previous != clipboard) {
+	while (!paragraph()) {
+		if (previous = clipboard) {
+			clipboard := buffer
+			SendInput { Up }
+			return
+		}
 		previous := clipboard
 		SendInput, +{ Up }
 	}
@@ -219,7 +228,12 @@ verticalMButton(byref y0, y1, previousY) {
 	previous := clipboard
 	SendInput +{ Down }
 	
-	while (!paragraph() and previous != clipboard) {
+	while (!paragraph()) {
+		if (previous = clipboard) {
+			clipboard := buffer
+			SendInput { Down }
+			return
+		}
 		previous := clipboard
 		SendInput, +{ Down }
 	}
@@ -230,11 +244,8 @@ verticalMButton(byref y0, y1, previousY) {
 	return
 
 ; how to handle when text is already highlighted
-; how to handle ctrl up and down
-
-; work out edge cases
-; what if reach the start or end of a line
-; what if reach start or end of file
+; how to handle ctrl up and down  
+; modifier keys get stuck -- how to prevent
 
 word() {
 	clipboard = 
