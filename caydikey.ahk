@@ -1,6 +1,8 @@
 defaults() {
 	global
 	SetMouseDelay, -1
+	SetKeyDelay, -1
+	SetBatchLines, -1
 	
 	;;;;
 	;;
@@ -10,7 +12,7 @@ defaults() {
 	;;;;
 	;;
 	;;;;
-	delimiter = `r`n
+	delimiter = "\r\n"
 	;;;;
 	;;
 	;;;;
@@ -35,21 +37,21 @@ defaults()
 ;; Sends a right click when win + left click is fired.
 ;;;;
 #LButton::
-	Send { RButton }
+	SendInput { RButton }
 	return
 
 ;;;;
 ;; Scrolls the mouse wheel left when win + scroll up is fired.
 ;;;;
 #WheelUp::
-	Send { WheelLeft }
+	SendInput { WheelLeft }
 	return
 
 ;;;;
 ;; Scrolls the mouse wheel right when win + scroll down is fired.
 ;;;;
 #WheelDown::
-	Send { WheelRight }
+	SendInput { WheelRight }
 	return
 
 ;;;;
@@ -57,7 +59,7 @@ defaults()
 ;;;;
 Insert::
 	buffer = %clipboard%
-	Send, ^c
+	SendInput, ^c
 	clipboard = %buffer%%delimiter%%clipboard%
 	return
 
@@ -66,9 +68,9 @@ Insert::
 ;;;;
 ^Insert::
 	buffer = %clipboard%
-	Send, ^c
+	SendInput, ^c
 	StringReplace, clipboard, buffer, %blank%, %clipboard%
-	Send, ^v
+	SendInput, ^v
 	clipboard = %buffer%
 	return
 
@@ -135,13 +137,13 @@ verticalMButton(byref y0, y1, previousY) {
 ^Right::
 	buffer := clipboard
 	previous := clipboard
-	Send ^+{ Right }
+	SendInput ^+{ Right }
 	
 	while (!word() and previous != clipboard) {
 		previous := clipboard
-		Send, ^+{ Right }
+		SendInput, ^+{ Right }
 	}
-	Send { Right }
+	SendInput { Right }
 	clipboard := buffer
 	return
 
@@ -151,11 +153,11 @@ verticalMButton(byref y0, y1, previousY) {
 +^Right::
 	buffer := clipboard
 	previous := clipboard
-	Send ^+{ Right }
+	SendInput ^+{ Right }
 
 	while (!wordEnd() and previous != clipboard) {
 		previous := clipboard
-		Send, ^+{ Right }
+		SendInput, ^+{ Right }
 	}
 	clipboard := buffer
 	return
@@ -166,13 +168,13 @@ verticalMButton(byref y0, y1, previousY) {
 ^Left::
 	buffer := clipboard
 	previous := clipboard
-	Send ^+{ Left }
+	SendInput ^+{ Left }
 	
 	while (!word() and previous != clipboard) {
 		previous := clipboard
-		Send, ^+{ Left }
+		SendInput, ^+{ Left }
 	}
-	Send { Left }
+	SendInput { Left }
 	clipboard := buffer
 	return
 
@@ -182,42 +184,78 @@ verticalMButton(byref y0, y1, previousY) {
 +^Left::
 	buffer := clipboard
 	previous := clipboard
-	Send ^+{ Left }
+	SendInput ^+{ Left }
 
 	while (word() != 1 and previous != clipboard) {
 		previous := clipboard
-		Send, ^+{ Left }
+		SendInput, ^+{ Left }
 	}
+	clipboard := buffer
+	return
+
+;;;;
+;;
+;;;;
+^Up::
+	buffer := clipboard
+	previous := clipboard
+	SendInput +{ Up }
+	
+	while (!paragraph() and previous != clipboard) {
+		previous := clipboard
+		SendInput, +{ Up }
+	}
+	SendInput { Up }
+	SendInput { Down }
+	SendInput { Down }
+	clipboard := buffer
+	return
+
+;;;;
+;;
+;;;;
+^Down::
+	buffer := clipboard
+	previous := clipboard
+	SendInput +{ Down }
+	
+	while (!paragraph() and previous != clipboard) {
+		previous := clipboard
+		SendInput, +{ Down }
+	}
+	SendInput { Down }
+	SendInput { Up }
+	SendInput { Up }
 	clipboard := buffer
 	return
 
 ; how to handle when text is already highlighted
 ; how to handle ctrl up and down
 
-; ideally, would scroll by paragraphs
-; paragraph is a new line
-; search for consecutive new line char
-
-; control up - hit up arow x times
-
-; work out edge cases, what if reach the end or the beginning of a line
+; work out edge cases
+; what if reach the start or end of a line
+; what if reach start or end of file
 
 word() {
 	clipboard = 
-	Send, ^c
+	SendInput, ^c
 	ClipWait
 	return RegExMatch(clipboard, "[a-zA-Z0-9]")
 }
 
 wordEnd() {
 	clipboard = 
-	Send, ^c
+	SendInput, ^c
 	ClipWait
 	return RegExMatch(clipboard, "[a-zA-Z0-9]$")
 }
 
 paragraph() {
-	return RegExMatch(clipboard, %delimiter%%delimiter%)
+	clipboard = 
+	SendInput, ^c
+	ClipWait
+	newline := ".*[\s]*\r\n[\s]*\r\n[\s]*"
+	return RegExMatch(clipboard, newline)
 }
 
 ;ListVars
