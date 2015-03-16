@@ -1,108 +1,106 @@
-defaults() {
+;;;;
+;; Global settings.
+;;;;
+Init() {
 	global
-	
+
 	#NoEnv
 	SetBatchLines, -1
 	SetMouseDelay, -1
 	SetKeyDelay, -1, -1
 	ListLines, Off
-	
+
 	;;;;
-	;;
-	;;;;
-	#MaxHotKeysPerInterval 200
-	
-	;;;;
-	;;
-	;;;;
-	delimiter = "\r\n"
-	;;;;
-	;;
+	;; Variables for insert commands.
 	;;;;
 	blank = __
-	
+	newline = "\r\n"
+
 	;;;;
-	;;
+	;; Variables for panning.
 	;;;;
-	resolution = 10
-	;;;;
-	;;
-	;;;;
+	resolution = 1
 	inverted := true ? 1 : -1
-	;;;;
-	;;
-	;;;;
 	tolerance = 5
 }
-defaults()
+Init()
 
 ;;;;
-;; Sends a right click when win + left click is fired.
+;; Navigation commands.
 ;;;;
 #LButton::
 	SendInput { RButton }
 	return
 
-;;;;
-;; Scrolls the mouse wheel left when win + scroll up is fired.
-;;;;
 #WheelUp::
 	SendInput { WheelLeft }
 	return
 
-;;;;
-;; Scrolls the mouse wheel right when win + scroll down is fired.
-;;;;
 #WheelDown::
 	SendInput { WheelRight }
 	return
 
-;;;;
-;; Appends the hightlighted text to the clipboard, delimited by a delimiter.
-;;;;
-Insert::
-	buffer = %clipboard%
-	SendInput, ^c
-	clipboard = %buffer%%delimiter%%clipboard%
+#LAlt::
+	SendInput { LButton Down }
+	KeyWait, LAlt
+	SendInput { LButton Up }
 	return
+
+RAlt::
+	SendInput { RButton Down }
+	KeyWait, RAlt
+	SendInput { RButton }
 	return
 
 ;;;;
-;; Replaces the blank with the highlighted text.
+;; Insert commands.
 ;;;;
+
+; Appends the selected text to the clipboard, delimited by a newline.
+Insert::
+	buffer = %clipboard%
+	clipboard = 
+	SendInput, ^c
+	ClipWait
+	clipboard = %buffer%%newline%%clipboard%
+	return
+
+; Replaces the blank with the highlighted text.
 ^Insert::
 	buffer = %clipboard%
+	clipboard = 
 	SendInput, ^c
+	ClipWait
 	StringReplace, clipboard, buffer, %blank%, %clipboard%
 	SendInput, ^v
 	clipboard = %buffer%
 	return
 
 ;;;;
-;; Pans the window when holding the middle mouse button and moving the mouse.
-;;;;
+;; Panning commands.
+;;;
+
+; Pans the window when holding the middle mouse button and moving the mouse.
 MButton::
 	MouseGetPos, xi, yi
 	x0 := xi
 	y0 := yi
-	
+
 	while (GetKeyState("MButton", "P")) {
 		Sleep, %resolution%
 		MouseGetPos, x1, y1
-		previousX := horizontalMButton(x0, x1, previousX)
-		previousY := verticalMButton(y0, y1, previousY)
+		previousX := HorizontalMButton(x0, x1, previousX)
+		previousY := VerticalMButton(y0, y1, previousY)
 	}
-	
+
 	MouseGetPos, xf, yf
 	if (xf = xi and yf = yi) {
-	}
-	return	
 		Click, Middle
+	}
+	return
 
-;;;;
-;; Helper function that handles horizontal scrolls.
-;;;;
-horizontalMButton(byref x0, x1, previousX) {
+; Helper function that handles horizontal scrolls.
+HorizontalMButton(byref x0, x1, previousX) {
 	global
 	deltaX := inverted * (x1 - x0)
 	if (deltaX >= tolerance and previousX >= tolerance) {
@@ -117,10 +115,8 @@ horizontalMButton(byref x0, x1, previousX) {
 	return deltaX
 }
 
-;;;;
-;; Helper function that handles vertical scrolls.
-;;;;
-verticalMButton(byref y0, y1, previousY) {
+; Helper function that handles vertical scrolls.
+VerticalMButton(byref y0, y1, previousY) {
 	global
 	deltaY := inverted * (y1 - y0)
 	if (deltaY >= tolerance and previousY >= tolerance) {
@@ -136,138 +132,168 @@ verticalMButton(byref y0, y1, previousY) {
 }
 
 ;;;;
-;; Moves cursor through text until either the beginning of a word or the end of a word.
+;; Text navigation commands.
 ;;;;
+
+; Move the cursor to the end of a word.
 ^Right::
-	buffer := clipboard
-	previous := clipboard
-	SendInput ^+{ Right }
-	
-	while (!word() and previous != clipboard) {
-		previous := clipboard
-		SendInput, ^+{ Right }
-	}
+	SelectRight()
 	SendInput { Right }
-	clipboard := buffer
 	return
 
-;;;;
-;;
-;;;;
+; Select to the end of a word.
 +^Right::
+	SelectRight()
+	return
+
+;
+SelectRight() {
 	buffer := clipboard
 	previous := clipboard
 	SendInput ^+{ Right }
 
-	while (!wordEnd() and previous != clipboard) {
+	while (!WordRight() and previous != clipboard) {
 		previous := clipboard
 		SendInput, ^+{ Right }
 	}
 	clipboard := buffer
 	return
-	
-;;;;
-;;
-;;;;
+}
+
+;
+WordRight() {
+	clipboard = 
+	SendInput, ^c
+	ClipWait
+	if (NonWord(SubStr(clipboard, 0))) {
+		return false
+	}
+	return true
+}
+
+;
 ^Left::
-	buffer := clipboard
-	previous := clipboard
-	SendInput ^+{ Left }
-	
-	while (!word() and previous != clipboard) {
-		previous := clipboard
-		SendInput, ^+{ Left }
-	}
+	SelectLeft()
 	SendInput { Left }
-	clipboard := buffer
 	return
 
-;;;;
-;;
-;;;;
+;
 +^Left::
+	SelectLeft()
+	return
+
+;
+SelectLeft() {
 	buffer := clipboard
 	previous := clipboard
 	SendInput ^+{ Left }
 
-	while (word() != 1 and previous != clipboard) {
+	while (!WordLeft() and previous != clipboard) {
 		previous := clipboard
 		SendInput, ^+{ Left }
 	}
 	clipboard := buffer
 	return
+}
 
-;;;;
-;;
-;;;;
+;
+WordLeft() {
+	clipboard = 
+	SendInput, ^c
+	ClipWait
+	if (NonWord(SubStr(clipboard, 1, 1))) {
+		return false
+	}
+	return true
+}
+
+NonWord(char) {
+	return RegExMatch(char, "\W")
+}
+
+;
 ^Up::
+	SelectUp()
+	SendInput { Home }
+	SendInput { Down }
+	SendInput { Home }
+	return
+
++^Up::
+	SelectUp()
+	SendInput +{ Home }
+	SendInput +{ Down }
+	SendInput +{ Home }
+	return
+
+SelectUp() {
 	buffer := clipboard
 	previous := clipboard
 	SendInput +{ Up }
-	
-	while (!paragraph()) {
-		if (previous = clipboard) {
-			clipboard := buffer
-			SendInput { Up }
-			return
-		}
+
+	while (!BlockUp() and previous != clipboard) {
 		previous := clipboard
 		SendInput, +{ Up }
+		SendInput, +{ End }
 	}
-	SendInput { Up }
-	SendInput { Down }
-	SendInput { Down }
 	clipboard := buffer
 	return
+}
 
-;;;;
-;;
-;;;;
+BlockUp() {
+	clipboard = 
+	SendInput, ^c
+	ClipWait
+	if (Block(SubStr(clipboard, 1, 4))) {
+		return true
+	}
+	return false
+}
+
+;
 ^Down::
+	SelectDown()
+	SendInput { End }
+	SendInput { Up }
+	SendInput { End }
+	return
+
++^Down::
+	SelectDown()
+	SendInput +{ End }
+	SendInput +{ Up }
+	SendInput +{ End }
+	return
+
+SelectDown() {
 	buffer := clipboard
 	previous := clipboard
 	SendInput +{ Down }
-	
-	while (!paragraph()) {
-		if (previous = clipboard) {
-			clipboard := buffer
-			SendInput { Down }
-			return
-		}
+
+	while (!BlockDown() and previous != clipboard) {
 		previous := clipboard
 		SendInput, +{ Down }
+		SendInput, +{ Home }
 	}
-	SendInput { Down }
-	SendInput { Up }
-	SendInput { Up }
 	clipboard := buffer
 	return
+}
 
-; how to handle when text is already highlighted
-; how to handle ctrl up and down  
-; modifier keys get stuck -- how to prevent
-
-word() {
+BlockDown() {
 	clipboard = 
 	SendInput, ^c
 	ClipWait
-	return RegExMatch(clipboard, "[a-zA-Z0-9]")
+	if (Block(SubStr(clipboard, -3))) {
+		return true
+	}
+	return false
 }
 
-wordEnd() {
-	clipboard = 
-	SendInput, ^c
-	ClipWait
-	return RegExMatch(clipboard, "[a-zA-Z0-9]$")
+Block(line) {
+	return RegExMatch(line, "\r\n\r\n")
 }
 
-paragraph() {
-	clipboard = 
-	SendInput, ^c
-	ClipWait
-	newline := ".*[\s]*\r\n[\s]*\r\n[\s]*"
-	return RegExMatch(clipboard, newline)
-}
+;; need something for direction
 
 ;ListVars
 ;Pause
