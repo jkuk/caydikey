@@ -19,37 +19,41 @@ Init() {
 	;;;;
 	;; Variables for panning.
 	;;;;
-	resolution = 1
+	frequency = 100
+	period := 1000 / frequency
 	inverted := true ? 1 : -1
-	tolerance = 5
+	speed = 1.0
+	tolerance = 25
 }
 Init()
 
 ;;;;
 ;; Navigation commands.
 ;;;;
+#LAlt::
+	Click Down Left
+	KeyWait, LAlt
+	Click Up Left
+	return
+
+#Space::
+	Click Down Right
+	KeyWait, Space
+	Click Up Right
+	return
+
 #LButton::
-	SendInput { RButton }
+	Click Down Right
+	KeyWait, LButton
+	Click Up Right
 	return
 
 #WheelUp::
-	SendInput { WheelLeft }
+	Click WheelLeft
 	return
 
 #WheelDown::
-	SendInput { WheelRight }
-	return
-
-#LAlt::
-	SendInput { LButton Down }
-	KeyWait, LAlt
-	SendInput { LButton Up }
-	return
-
-RAlt::
-	SendInput { RButton Down }
-	KeyWait, RAlt
-	SendInput { RButton }
+	Click WheelRight
 	return
 
 ;;;;
@@ -85,12 +89,14 @@ MButton::
 	MouseGetPos, xi, yi
 	x0 := xi
 	y0 := yi
+	firstX = true
+	firstY = true
 
 	while (GetKeyState("MButton", "P")) {
-		Sleep, %resolution%
+		Sleep, %period%
 		MouseGetPos, x1, y1
-		previousX := HorizontalMButton(x0, x1, previousX)
-		previousY := VerticalMButton(y0, y1, previousY)
+		firstX := HorizontalMButton(x0, x1, firstX)
+		firstY := VerticalMButton(y0, y1, firstY)
 	}
 
 	MouseGetPos, xf, yf
@@ -100,197 +106,59 @@ MButton::
 	return
 
 ; Helper function that handles horizontal scrolls.
-HorizontalMButton(byref x0, x1, previousX) {
+HorizontalMButton(byref x0, x1, firstX) {
 	global
 	deltaX := inverted * (x1 - x0)
-	if (deltaX >= tolerance and previousX >= tolerance) {
+	;deltaX := deltaX * speed
+	if (firstX) {
+		if (deltaX > tolerance) {
+			deltaX := deltaX - tolerance
+		}
+		else if (deltaX < -tolerance) {
+			deltaX := deltaX + tolerance
+		}
+		else {
+			return true
+		}
+	}
+	if (deltaX > 0) {
 		Click, WheelLeft, , , %deltaX%
 		x0 := x1
 	}
-	else if (deltaX <= -tolerance and previousX <= -tolerance) {
+	else if (deltaX < 0) {
 		deltaX := -1 * deltaX
 		Click, WheelRight, , , %deltaX%
 		x0 := x1
 	}
-	return deltaX
+	return false
 }
 
 ; Helper function that handles vertical scrolls.
-VerticalMButton(byref y0, y1, previousY) {
+VerticalMButton(byref y0, y1, firstY) {
 	global
 	deltaY := inverted * (y1 - y0)
-	if (deltaY >= tolerance and previousY >= tolerance) {
+	;deltaY := deltaY * speed
+	if (firstY) {
+		if (deltaY > tolerance) {
+			deltaY := deltaY - tolerance
+		}
+		else if (deltaY < -tolerance) {
+			deltaY := deltaY + tolerance
+		}
+		else {
+			return true
+		}
+	}
+	if (deltaY > 0) {
 		Click, WheelUp, , , %deltaY%
 		y0 := y1
 	}
-	else if (deltaY <= -tolerance and previousY <= tolerance) {
+	else if (deltaY < 0) {
 		deltaY := -1 * deltaY
 		Click, WheelDown, , , %deltaY%
 		y0 := y1
 	}
-	return deltaY
-}
-
-;;;;
-;; Text navigation commands.
-;;;;
-
-; Move the cursor to the end of a word.
-^Right::
-	SelectRight()
-	SendInput { Right }
-	return
-
-; Select to the end of a word.
-+^Right::
-	SelectRight()
-	return
-
-;
-SelectRight() {
-	buffer := clipboard
-	previous := clipboard
-	SendInput ^+{ Right }
-
-	while (!WordRight() and previous != clipboard) {
-		previous := clipboard
-		SendInput, ^+{ Right }
-	}
-	clipboard := buffer
-	return
-}
-
-;
-WordRight() {
-	clipboard = 
-	SendInput, ^c
-	ClipWait
-	if (NonWord(SubStr(clipboard, 0))) {
-		return false
-	}
-	return true
-}
-
-;
-^Left::
-	SelectLeft()
-	SendInput { Left }
-	return
-
-;
-+^Left::
-	SelectLeft()
-	return
-
-;
-SelectLeft() {
-	buffer := clipboard
-	previous := clipboard
-	SendInput ^+{ Left }
-
-	while (!WordLeft() and previous != clipboard) {
-		previous := clipboard
-		SendInput, ^+{ Left }
-	}
-	clipboard := buffer
-	return
-}
-
-;
-WordLeft() {
-	clipboard = 
-	SendInput, ^c
-	ClipWait
-	if (NonWord(SubStr(clipboard, 1, 1))) {
-		return false
-	}
-	return true
-}
-
-NonWord(char) {
-	return RegExMatch(char, "\W")
-}
-
-;
-^Up::
-	SelectUp()
-	SendInput { Home }
-	SendInput { Down }
-	SendInput { Home }
-	return
-
-+^Up::
-	SelectUp()
-	SendInput +{ Home }
-	SendInput +{ Down }
-	SendInput +{ Home }
-	return
-
-SelectUp() {
-	buffer := clipboard
-	previous := clipboard
-	SendInput +{ Up }
-
-	while (!BlockUp() and previous != clipboard) {
-		previous := clipboard
-		SendInput, +{ Up }
-		SendInput, +{ End }
-	}
-	clipboard := buffer
-	return
-}
-
-BlockUp() {
-	clipboard = 
-	SendInput, ^c
-	ClipWait
-	if (Block(SubStr(clipboard, 1, 4))) {
-		return true
-	}
 	return false
-}
-
-;
-^Down::
-	SelectDown()
-	SendInput { End }
-	SendInput { Up }
-	SendInput { End }
-	return
-
-+^Down::
-	SelectDown()
-	SendInput +{ End }
-	SendInput +{ Up }
-	SendInput +{ End }
-	return
-
-SelectDown() {
-	buffer := clipboard
-	previous := clipboard
-	SendInput +{ Down }
-
-	while (!BlockDown() and previous != clipboard) {
-		previous := clipboard
-		SendInput, +{ Down }
-		SendInput, +{ Home }
-	}
-	clipboard := buffer
-	return
-}
-
-BlockDown() {
-	clipboard = 
-	SendInput, ^c
-	ClipWait
-	if (Block(SubStr(clipboard, -3))) {
-		return true
-	}
-	return false
-}
-
-Block(line) {
-	return RegExMatch(line, "\r\n\r\n")
 }
 
 ;; need something for direction
